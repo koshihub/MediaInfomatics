@@ -1,1 +1,10 @@
 c:\users\ko\documents\visual studio 2013\Projects\MediaInfomatics\MediaInfomatics\bin\Debug\MediaInfomatics.exe.config
+C:\Users\furag_000\Dropbox\Research\メディア情報学\MediaInfomatics\MediaInfomatics\bin\Debug\MediaInfomatics.exe.config
+C:\Users\furag_000\Dropbox\Research\メディア情報学\MediaInfomatics\MediaInfomatics\obj\Debug\MediaInfomatics.csprojResolveAssemblyReference.cache
+C:\Users\furag_000\Dropbox\Research\メディア情報学\MediaInfomatics\MediaInfomatics\obj\Debug\MediaInfomatics.Form1.resources
+C:\Users\furag_000\Dropbox\Research\メディア情報学\MediaInfomatics\MediaInfomatics\obj\Debug\MediaInfomatics.Properties.Resources.resources
+C:\Users\furag_000\Dropbox\Research\メディア情報学\MediaInfomatics\MediaInfomatics\obj\Debug\MediaInfomatics.csproj.GenerateResource.Cache
+C:\Users\furag_000\Dropbox\Research\メディア情報学\MediaInfomatics\MediaInfomatics\bin\Debug\MediaInfomatics.exe
+C:\Users\furag_000\Dropbox\Research\メディア情報学\MediaInfomatics\MediaInfomatics\bin\Debug\MediaInfomatics.pdb
+C:\Users\furag_000\Dropbox\Research\メディア情報学\MediaInfomatics\MediaInfomatics\obj\Debug\MediaInfomatics.exe
+C:\Users\furag_000\Dropbox\Research\メディア情報学\MediaInfomatics\MediaInfomatics\obj\Debug\MediaInfomatics.pdb
