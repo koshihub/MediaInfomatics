@@ -17,8 +17,12 @@ namespace MediaInfomatics
         KinectSensor sensor;
         byte[] colorPixels;
         Bitmap colorBitmap;
-        bool IsSendText = false;
-        string SendText;
+        DepthImagePixel[] depthPixels;
+
+        bool RGBMode = true;
+        bool DepthMode = false;
+
+        #region Initialize
         public Form1()
         {
             InitializeComponent();
@@ -26,10 +30,6 @@ namespace MediaInfomatics
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            // Look through all sensors and start the first connected one.
-            // This requires that a Kinect is connected at the time of app startup.
-            // To make your app robust against plug/unplug, 
-            // it is recommended to use KinectSensorChooser provided in Microsoft.Kinect.Toolkit (See components in Toolkit Browser).
             foreach (var potentialSensor in KinectSensor.KinectSensors)
             {
                 if (potentialSensor.Status == KinectStatus.Connected)
@@ -41,26 +41,15 @@ namespace MediaInfomatics
 
             if (null != this.sensor)
             {
-                // Turn on the skeleton stream to receive skeleton frames
                 this.sensor.SkeletonStream.Enable();
-
-                // Add an event handler to be called whenever there is new color frame data
                 this.sensor.SkeletonFrameReady += this.SensorSkeletonFrameReady;
-
-                // Turn on the color stream to receive color frames
                 this.sensor.ColorStream.Enable(ColorImageFormat.RgbResolution640x480Fps30);
-
-                // Allocate space to put the pixels we'll receive
+                this.sensor.DepthStream.Enable(DepthImageFormat.Resolution640x480Fps30);
                 this.colorPixels = new byte[this.sensor.ColorStream.FramePixelDataLength];
-
-                // This is the bitmap we'll display on-screen
+                this.depthPixels = new DepthImagePixel[this.sensor.DepthStream.FramePixelDataLength];
                 this.colorBitmap = new Bitmap(this.sensor.ColorStream.FrameWidth, this.sensor.ColorStream.FrameHeight, System.Drawing.Imaging.PixelFormat.Format32bppRgb);
-
-                // Add an event handler to be called whenever there is new color frame data
                 this.sensor.ColorFrameReady += this.SensorColorFrameReady;
-
-
-                // Start the sensor!
+                this.sensor.DepthFrameReady += this.SensorDepthFrameReady;
                 try
                 {
                     this.sensor.Start();
@@ -70,7 +59,7 @@ namespace MediaInfomatics
                     this.sensor = null;
                 }
             }
-            pictureBox1.Image = new Bitmap(640, 480);
+            cameraCanvas.Image = new Bitmap(640, 480);
         }
         unsafe private void SensorColorFrameReady(object sender, ColorImageFrameReadyEventArgs e)
         {
@@ -78,19 +67,43 @@ namespace MediaInfomatics
             {
                 if (colorFrame != null)
                 {
-                    // Copy the pixel data from the image to a temporary array
                     colorFrame.CopyPixelDataTo(this.colorPixels);
-
-                    var lck = colorBitmap.LockBits(new Rectangle(0, 0, 640, 480), System.Drawing.Imaging.ImageLockMode.ReadWrite, System.Drawing.Imaging.PixelFormat.Format32bppRgb);
-                    byte* p = (byte*)lck.Scan0;
-                    for (int i = 0; i < colorPixels.Length / 4; i++)
+                    if (RGBMode)
                     {
-                        p[4 * i] = colorPixels[4 * i];
-                        p[4 * i + 1] = colorPixels[4 * i + 1];
-                        p[4 * i + 2] = colorPixels[4 * i + 2];
-                        p[4 * i + 3] = colorPixels[4 * i + 3];
+                        var lck = colorBitmap.LockBits(new Rectangle(0, 0, 640, 480), System.Drawing.Imaging.ImageLockMode.ReadWrite, System.Drawing.Imaging.PixelFormat.Format32bppRgb);
+                        byte* p = (byte*)lck.Scan0;
+                        for (int i = 0; i < colorPixels.Length / 4; i++)
+                        {
+                            p[4 * i] = colorPixels[4 * i];
+                            p[4 * i + 1] = colorPixels[4 * i + 1];
+                            p[4 * i + 2] = colorPixels[4 * i + 2];
+                            p[4 * i + 3] = colorPixels[4 * i + 3];
+                        }
+                        colorBitmap.UnlockBits(lck);
                     }
-                    colorBitmap.UnlockBits(lck);
+                }
+            }
+        }
+        unsafe private void SensorDepthFrameReady(object sender, DepthImageFrameReadyEventArgs e)
+        {
+            using (DepthImageFrame depthFrame = e.OpenDepthImageFrame())
+            {
+                if (depthFrame != null)
+                {
+                    depthFrame.CopyDepthImagePixelDataTo(this.depthPixels);
+                    if (DepthMode)
+                    {
+                        var lck = colorBitmap.LockBits(new Rectangle(0, 0, 640, 480), System.Drawing.Imaging.ImageLockMode.ReadWrite, System.Drawing.Imaging.PixelFormat.Format32bppRgb);
+                        byte* p = (byte*)lck.Scan0;
+                        for (int i = 0; i < depthPixels.Length; i++)
+                        {
+                            p[4 * i] =
+                            p[4 * i + 1] =
+                            p[4 * i + 2] =
+                            p[4 * i + 3] = (byte)(depthPixels[i].Depth >> 4);
+                        }
+                        colorBitmap.UnlockBits(lck);
+                    }
                 }
             }
         }
@@ -108,7 +121,7 @@ namespace MediaInfomatics
                 }
             }
 
-            using (var g = Graphics.FromImage(pictureBox1.Image))
+            using (var g = Graphics.FromImage(cameraCanvas.Image))
             {
                 g.Clear(Color.Black);
                 g.DrawImage(colorBitmap, Point.Empty);
@@ -122,55 +135,53 @@ namespace MediaInfomatics
                             if (skel.TrackingState == SkeletonTrackingState.Tracked)
                             {
                                 this.DrawBonesAndJoints(skel, g);
-
-                                var posL = SkeletonPointToScreen(skel.Joints[JointType.HandLeft].Position);
-                                var posR = SkeletonPointToScreen(skel.Joints[JointType.HandRight].Position);
-                                SendText = posL.X + " " + posL.Y + " " + posR.X + " " + posR.Y;
-                                IsSendText = true;
-
-                    //            treeView1.Nodes[0].Text = string.Format("Left Hand: ({0}, {1})", posL.X, posL.Y);
-                    //            treeView1.Nodes[1].Text = string.Format("Right Hand: ({0}, {1})", posR.X, posR.Y);
+                                var ray = GetPointingPosition(skel);
+                                if (ray != null)
+                                {
+                                    g.DrawLine(new Pen(Brushes.Red, 5),
+                                        SkeletonPointToScreen(ray.Item2),
+                                        SkeletonPointToScreen(ray.Item1));
+                                }
                             }
                         }
                     }
                 }
             }
         }
-        /// <summary>
+        #endregion
+
+        #region Draw
         /// Draws a skeleton's bones and joints
-        /// </summary>
-        /// <param name="skeleton">skeleton to draw</param>
-        /// <param name="drawingContext">drawing context to draw to</param>
         private void DrawBonesAndJoints(Skeleton skeleton, Graphics g)
         {
             // Render Torso
             this.DrawBone(skeleton, g, JointType.Head, JointType.ShoulderCenter);
-            this.DrawBone(skeleton, g,  JointType.ShoulderCenter, JointType.ShoulderLeft);
-            this.DrawBone(skeleton, g,  JointType.ShoulderCenter, JointType.ShoulderRight);
-            this.DrawBone(skeleton, g,  JointType.ShoulderCenter, JointType.Spine);
-            this.DrawBone(skeleton, g,  JointType.Spine, JointType.HipCenter);
-            this.DrawBone(skeleton, g,  JointType.HipCenter, JointType.HipLeft);
-            this.DrawBone(skeleton, g,  JointType.HipCenter, JointType.HipRight);
+            this.DrawBone(skeleton, g, JointType.ShoulderCenter, JointType.ShoulderLeft);
+            this.DrawBone(skeleton, g, JointType.ShoulderCenter, JointType.ShoulderRight);
+            this.DrawBone(skeleton, g, JointType.ShoulderCenter, JointType.Spine);
+            this.DrawBone(skeleton, g, JointType.Spine, JointType.HipCenter);
+            this.DrawBone(skeleton, g, JointType.HipCenter, JointType.HipLeft);
+            this.DrawBone(skeleton, g, JointType.HipCenter, JointType.HipRight);
 
             // Left Arm
-            this.DrawBone(skeleton, g,  JointType.ShoulderLeft, JointType.ElbowLeft);
-            this.DrawBone(skeleton, g,  JointType.ElbowLeft, JointType.WristLeft);
-            this.DrawBone(skeleton, g,  JointType.WristLeft, JointType.HandLeft);
+            this.DrawBone(skeleton, g, JointType.ShoulderLeft, JointType.ElbowLeft);
+            this.DrawBone(skeleton, g, JointType.ElbowLeft, JointType.WristLeft);
+            this.DrawBone(skeleton, g, JointType.WristLeft, JointType.HandLeft);
 
             // Right Arm
-            this.DrawBone(skeleton, g,  JointType.ShoulderRight, JointType.ElbowRight);
-            this.DrawBone(skeleton, g,  JointType.ElbowRight, JointType.WristRight);
-            this.DrawBone(skeleton, g,  JointType.WristRight, JointType.HandRight);
+            this.DrawBone(skeleton, g, JointType.ShoulderRight, JointType.ElbowRight);
+            this.DrawBone(skeleton, g, JointType.ElbowRight, JointType.WristRight);
+            this.DrawBone(skeleton, g, JointType.WristRight, JointType.HandRight);
 
             // Left Leg
-            this.DrawBone(skeleton, g,  JointType.HipLeft, JointType.KneeLeft);
-            this.DrawBone(skeleton, g,  JointType.KneeLeft, JointType.AnkleLeft);
-            this.DrawBone(skeleton, g,  JointType.AnkleLeft, JointType.FootLeft);
+            this.DrawBone(skeleton, g, JointType.HipLeft, JointType.KneeLeft);
+            this.DrawBone(skeleton, g, JointType.KneeLeft, JointType.AnkleLeft);
+            this.DrawBone(skeleton, g, JointType.AnkleLeft, JointType.FootLeft);
 
             // Right Leg
-            this.DrawBone(skeleton, g,  JointType.HipRight, JointType.KneeRight);
-            this.DrawBone(skeleton, g,  JointType.KneeRight, JointType.AnkleRight);
-            this.DrawBone(skeleton, g,  JointType.AnkleRight, JointType.FootRight);
+            this.DrawBone(skeleton, g, JointType.HipRight, JointType.KneeRight);
+            this.DrawBone(skeleton, g, JointType.KneeRight, JointType.AnkleRight);
+            this.DrawBone(skeleton, g, JointType.AnkleRight, JointType.FootRight);
 
             // Render Joints
             foreach (Joint joint in skeleton.Joints)
@@ -179,16 +190,11 @@ namespace MediaInfomatics
 
                 if (drawBrush != null)
                 {
-                    g.DrawEllipse(new Pen(Brushes.Blue), new Rectangle( SkeletonPointToScreen(joint.Position), new Size( 3, 3)));
+                    g.DrawEllipse(new Pen(Brushes.Blue), new Rectangle(SkeletonPointToScreen(joint.Position), new Size(3, 3)));
                 }
             }
-        } /// <summary>
+        }
         /// Draws a bone line between two joints
-        /// </summary>
-        /// <param name="skeleton">skeleton to draw bones from</param>
-        /// <param name="drawingContext">drawing context to draw to</param>
-        /// <param name="jointType0">joint to start drawing from</param>
-        /// <param name="jointType1">joint to end drawing at</param>
         private void DrawBone(Skeleton skeleton, Graphics g, JointType jointType0, JointType jointType1)
         {
             Joint joint0 = skeleton.Joints[jointType0];
@@ -213,6 +219,8 @@ namespace MediaInfomatics
 
             g.DrawLine(drawPen, this.SkeletonPointToScreen(joint0.Position), this.SkeletonPointToScreen(joint1.Position));
         }
+
+
         private Point SkeletonPointToScreen(SkeletonPoint skelpoint)
         {
             // Convert point to depth space.  
@@ -221,12 +229,148 @@ namespace MediaInfomatics
             return new Point(depthPoint.X, depthPoint.Y);
         }
 
-        byte[] recieveTextBytes = new byte[1];
-
-        private void timer1_Tick(object sender, EventArgs e)
+        private SkeletonPoint SkeletonDepthPointToSkeltonPoint(int x, int y, int depth)
         {
-            pictureBox1.Invoke((Action)(() => pictureBox1.Invalidate()));
+            return this.sensor.CoordinateMapper.MapDepthPointToSkeletonPoint(DepthImageFormat.Resolution640x480Fps30,
+                new DepthImagePoint()
+                {
+                    Depth = depth,
+                    X = x,
+                    Y = y
+                });
+        }        
+        
+        #endregion
+
+        private void timer_Tick(object sender, EventArgs e)
+        {
+            cameraCanvas.Invoke((Action)(() => cameraCanvas.Invalidate()));
         }
 
+        private void radioButton1_CheckedChanged(object sender, EventArgs e)
+        {
+            RGBMode = true;
+            DepthMode = false;
+        }
+
+        private void radioButton2_CheckedChanged(object sender, EventArgs e)
+        {
+            RGBMode = false;
+            DepthMode = true;
+        }
+
+        Tuple<SkeletonPoint, SkeletonPoint> GetPointingPosition(Skeleton skelton)
+        {
+            if (skelton.Joints[JointType.ShoulderLeft].TrackingState == JointTrackingState.Tracked &&
+                skelton.Joints[JointType.HandLeft].TrackingState == JointTrackingState.Tracked)
+            {
+                SkeletonPoint sPt0 = skelton.Joints[JointType.ElbowLeft].Position;
+                SkeletonPoint sPt1 = skelton.Joints[JointType.HandLeft].Position;
+                Point pt0 = SkeletonPointToScreen(sPt0);
+                Point pt1 = SkeletonPointToScreen(sPt1);
+ /*               richTextBox1.Text = "diff0 = " + (sPt0.Z * 1000 - depthPixels[640 * pt0.Y + pt0.X].Depth) + "\n";
+                richTextBox1.Text += "diff1 = " + (sPt1.Z * 1000 - depthPixels[640 * pt1.Y + pt1.X].Depth) + "\n";
+                richTextBox1.Text += "sPt0.Z = " + sPt0.Z + "\n";
+                richTextBox1.Text += "sPt1.Z = " + sPt1.Z + "\n";
+                richTextBox1.Text += "Pt0.Depth = " + depthPixels[640 * pt0.Y + pt0.X].Depth + "\n";
+                richTextBox1.Text += "Pt1.Depth = " + depthPixels[640 * pt1.Y + pt1.X].Depth + "\n";
+                */
+                Vector4 dir = new Vector4()
+                {
+                    X = sPt1.X - sPt0.X,
+                    Y = sPt1.Y - sPt0.Y,
+                    Z = sPt1.Z - sPt0.Z,
+                };
+                float dirLen = (float)Math.Sqrt(dir.X * dir.X + dir.Y * dir.Y + dir.Z * dir.Z);
+                dir.X /= dirLen;
+                dir.Y /= dirLen;
+                dir.Z /= dirLen;
+
+                float dx = pt1.X - pt0.X;
+                float dy = pt1.Y - pt0.Y;
+                float len = (float)Math.Sqrt(dx * dx + dy * dy);
+                dx /= len;
+                dy /= len;
+
+                const float max_t = 1;
+                const float dt = 1 * 0.001f;
+                float t = 0;
+                float t3d = dirLen / len;
+                Vector4 dir3d = new Vector4()
+                {
+                    X = dir.X * t3d,
+                    Y = dir.Y * t3d,
+                    Z = dir.Z * t3d,
+                };
+
+                float minDist = float.MaxValue;
+                SkeletonPoint minPos = new SkeletonPoint();
+
+
+                while (t < max_t)
+                {
+                    t += dt;
+                    float x3d = sPt1.X + dir.X * t;
+                    float y3d = sPt1.Y + dir.Y * t;
+                    float z3d = sPt1.Z + dir.Z * t;
+                    var sPos = new SkeletonPoint() { X = x3d, Y = y3d, Z = z3d };
+                    var pt = SkeletonPointToScreen(sPos);
+                    int x = pt.X;
+                    int y = pt.Y;
+                    if (x < 0 || 640 <= x) continue;
+                    if (y < 0 || 480 <= y) continue;
+
+                    if (depthPixels[640 * y + x].IsKnownDepth)
+                    {
+                        int depth = 0;
+                        if (1 <= x && x < 639 && 1 <= y && y < 479)
+                        {
+                            for (int py = -1; py <= 1; py++)
+                            for (int px = -1; px <= 1; px++)
+                            {
+                                depth += depthPixels[640 * (y + py) + (x + px)].Depth;
+                            }
+                        }
+                        depth /= 9;
+                        var depthPos = SkeletonDepthPointToSkeltonPoint(x, y, depth);
+                        float ddx = sPos.X - depthPos.X;
+                        float ddy = sPos.Y - depthPos.Y;
+                        float ddz = sPos.Z - depthPos.Z;
+                        float dist = (float)Math.Sqrt(ddx * ddx + ddy * ddy + ddz * ddz);
+                        if (minDist < trackBar1.Value * 0.001f)
+                        {
+                            return new Tuple<SkeletonPoint, SkeletonPoint>(new SkeletonPoint()
+                            {
+                                X = x3d,
+                                Y = y3d,
+                                Z = z3d
+                            },
+                            sPt1);
+                        }
+                        if (minDist > dist)
+                        {
+                            minDist = Math.Abs(dist);
+                            minPos = new SkeletonPoint()
+                            {
+                                X = x3d,
+                                Y = y3d,
+                                Z = z3d
+                            };
+                        }
+                    }
+                }
+                if (minDist != float.MaxValue)
+                {
+//                    richTextBox1.Text += "min:" + minDist + "\n";
+                    return new Tuple<SkeletonPoint, SkeletonPoint>(minPos, sPt1);
+                }
+            }
+            return null;
+        }
+
+        private void trackBar1_Scroll(object sender, EventArgs e)
+        {
+            label1.Text = trackBar1.Value + "";
+        }
     }
 }
