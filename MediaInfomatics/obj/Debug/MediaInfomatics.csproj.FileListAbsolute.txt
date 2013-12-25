@@ -8,3 +8,12 @@ C:\Users\furag_000\Dropbox\Research\メディア情報学\MediaInfomatics\MediaI
 C:\Users\furag_000\Dropbox\Research\メディア情報学\MediaInfomatics\MediaInfomatics\bin\Debug\MediaInfomatics.pdb
 C:\Users\furag_000\Dropbox\Research\メディア情報学\MediaInfomatics\MediaInfomatics\obj\Debug\MediaInfomatics.exe
 C:\Users\furag_000\Dropbox\Research\メディア情報学\MediaInfomatics\MediaInfomatics\obj\Debug\MediaInfomatics.pdb
+C:\Users\Ko\GoogleDrive\Develop\MediaInfomatics\MediaInfomatics\bin\Debug\MediaInfomatics.exe.config
+C:\Users\Ko\GoogleDrive\Develop\MediaInfomatics\MediaInfomatics\obj\Debug\MediaInfomatics.exe
+C:\Users\Ko\GoogleDrive\Develop\MediaInfomatics\MediaInfomatics\obj\Debug\MediaInfomatics.pdb
+C:\Users\Ko\GoogleDrive\Develop\MediaInfomatics\MediaInfomatics\bin\Debug\MediaInfomatics.exe
+C:\Users\Ko\GoogleDrive\Develop\MediaInfomatics\MediaInfomatics\bin\Debug\MediaInfomatics.pdb
+C:\Users\Ko\GoogleDrive\Develop\MediaInfomatics\MediaInfomatics\obj\Debug\MediaInfomatics.csprojResolveAssemblyReference.cache
+C:\Users\Ko\GoogleDrive\Develop\MediaInfomatics\MediaInfomatics\obj\Debug\MediaInfomatics.Form1.resources
+C:\Users\Ko\GoogleDrive\Develop\MediaInfomatics\MediaInfomatics\obj\Debug\MediaInfomatics.Properties.Resources.resources
+C:\Users\Ko\GoogleDrive\Develop\MediaInfomatics\MediaInfomatics\obj\Debug\MediaInfomatics.csproj.GenerateResource.Cache

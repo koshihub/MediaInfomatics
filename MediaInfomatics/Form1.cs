@@ -18,6 +18,8 @@ namespace MediaInfomatics
         byte[] colorPixels;
         Bitmap colorBitmap;
         DepthImagePixel[] depthPixels;
+        Plane plane;
+        List<SkeletonPoint> planePixels;
 
         bool RGBMode = true;
         bool DepthMode = false;
@@ -47,6 +49,8 @@ namespace MediaInfomatics
                 this.sensor.DepthStream.Enable(DepthImageFormat.Resolution640x480Fps30);
                 this.colorPixels = new byte[this.sensor.ColorStream.FramePixelDataLength];
                 this.depthPixels = new DepthImagePixel[this.sensor.DepthStream.FramePixelDataLength];
+                this.planePixels = new List<SkeletonPoint>();
+                this.plane = null;
                 this.colorBitmap = new Bitmap(this.sensor.ColorStream.FrameWidth, this.sensor.ColorStream.FrameHeight, System.Drawing.Imaging.PixelFormat.Format32bppRgb);
                 this.sensor.ColorFrameReady += this.SensorColorFrameReady;
                 this.sensor.DepthFrameReady += this.SensorDepthFrameReady;
@@ -145,6 +149,11 @@ namespace MediaInfomatics
                             }
                         }
                     }
+                }
+                foreach (SkeletonPoint sp in planePixels)
+                {
+                    Point p = SkeletonPointToScreen(sp);
+                    g.FillEllipse(Brushes.Green, p.X - 5, p.Y - 5, 11, 11);
                 }
             }
         }
@@ -275,6 +284,14 @@ namespace MediaInfomatics
                 richTextBox1.Text += "Pt0.Depth = " + depthPixels[640 * pt0.Y + pt0.X].Depth + "\n";
                 richTextBox1.Text += "Pt1.Depth = " + depthPixels[640 * pt1.Y + pt1.X].Depth + "\n";
                 */
+
+                if ( plane != null )
+                {
+                    SkeletonPoint isp = plane.getIntersectionPoint(sPt1, sPt0);
+                    return new Tuple<SkeletonPoint, SkeletonPoint>(isp, sPt1);
+                }
+
+                /*
                 Vector4 dir = new Vector4()
                 {
                     X = sPt1.X - sPt0.X,
@@ -364,6 +381,7 @@ namespace MediaInfomatics
 //                    richTextBox1.Text += "min:" + minDist + "\n";
                     return new Tuple<SkeletonPoint, SkeletonPoint>(minPos, sPt1);
                 }
+                 * */
             }
             return null;
         }
@@ -371,6 +389,22 @@ namespace MediaInfomatics
         private void trackBar1_Scroll(object sender, EventArgs e)
         {
             label1.Text = trackBar1.Value + "";
+        }
+
+        private void cameraCanvas_MouseClick(object sender, MouseEventArgs e)
+        {
+            int depth = depthPixels[e.Y * 640 + e.X].Depth;
+            SkeletonPoint sp = SkeletonDepthPointToSkeltonPoint(e.X, e.Y, depth);
+            planePixels.Add(sp);
+
+            if (planePixels.Count == 4)
+            {
+                planePixels.RemoveAt(0);
+            }
+            else if(planePixels.Count == 3) 
+            {
+                plane = new Plane(planePixels[0], planePixels[1], planePixels[2]);
+            }
         }
     }
 }
