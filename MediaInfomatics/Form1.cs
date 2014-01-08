@@ -9,15 +9,30 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Kinect;
+using System.Net;
+using System.Net.Sockets;
+using System.Diagnostics;
 
 namespace MediaInfomatics
 {
     public partial class Form1 : Form
     {
+        //
+        const string Host = "127.0.0.1";
+        const int Port = 8890;
+        TcpListener server;
+        TcpClient client;
+        bool IsSendText = false;
+        string SendText;
+        byte[] recieveTextBytes = new byte[1];
+
+        //
         KinectSensor sensor;
         byte[] colorPixels;
         Bitmap colorBitmap;
         DepthImagePixel[] depthPixels;
+        Plane plane;
+        List<SkeletonPoint> planePixels;
 
         bool RGBMode = true;
         bool DepthMode = false;
@@ -47,6 +62,8 @@ namespace MediaInfomatics
                 this.sensor.DepthStream.Enable(DepthImageFormat.Resolution640x480Fps30);
                 this.colorPixels = new byte[this.sensor.ColorStream.FramePixelDataLength];
                 this.depthPixels = new DepthImagePixel[this.sensor.DepthStream.FramePixelDataLength];
+                this.planePixels = new List<SkeletonPoint>();
+                this.plane = null;
                 this.colorBitmap = new Bitmap(this.sensor.ColorStream.FrameWidth, this.sensor.ColorStream.FrameHeight, System.Drawing.Imaging.PixelFormat.Format32bppRgb);
                 this.sensor.ColorFrameReady += this.SensorColorFrameReady;
                 this.sensor.DepthFrameReady += this.SensorDepthFrameReady;
@@ -60,7 +77,85 @@ namespace MediaInfomatics
                 }
             }
             cameraCanvas.Image = new Bitmap(640, 480);
+
+            // Processingと接続
+            try
+            {
+                System.Threading.Tasks.Task.Factory.StartNew(() =>
+                {
+                    // サーバーを作る
+                    server = new TcpListener(IPAddress.Parse(Host), Port);
+
+                    // サーバーを接続待機させる
+                    server.Start();
+                    Console.WriteLine("connecting...");
+                    // サーバーから見たクライアントがclient、AcceptTcpClientで接続を待つ
+                    client = server.AcceptTcpClient();
+                    Console.WriteLine("connected!");
+
+                    while (client.Connected)
+                    {
+                        System.Threading.Thread.Sleep(16);
+                        if (IsSendText)
+                        {
+                            IsSendText = false;
+                            SendQuery(SendText);
+                        }
+                    }
+                });
+            }
+            catch (SocketException ee)
+            {
+                Console.WriteLine(ee.Message);
+            }
+            catch (Exception ee)
+            {
+                Console.WriteLine(ee.Message);
+            }
         }
+
+        #region ネットワーク通信
+
+        public string SendQuery(string query)
+        {
+            try
+            {
+                if (client != null)
+                {
+                    var sw = Stopwatch.StartNew();
+                    var stream = client.GetStream();
+                    byte[] sendData = Encoding.UTF8.GetBytes(query + ";");
+                    stream.Write(sendData, 0, sendData.Length);
+                    int total = 0;
+
+                    while (true)
+                    {
+                        if (total >= recieveTextBytes.Length) break;
+                        int readSize = stream.Read(recieveTextBytes, total, recieveTextBytes.Length - total);
+                        if (readSize <= 0) break;
+                        total += readSize;
+                    }
+
+                    // 文字列の長さを測定
+                    int length = 0;
+                    for (; length < recieveTextBytes.Length; length++)
+                    {
+                        if (recieveTextBytes[length] == 0) break;
+                    }
+
+                    return Encoding.UTF8.GetString(recieveTextBytes, 0, length);
+                }
+                return "";
+            }
+            catch (Exception ee)
+            {
+                Console.WriteLine(ee.Message);
+                return "";
+            }
+        }
+        #endregion
+
+
         unsafe private void SensorColorFrameReady(object sender, ColorImageFrameReadyEventArgs e)
         {
             using (ColorImageFrame colorFrame = e.OpenColorImageFrame())
@@ -138,6 +233,22 @@ namespace MediaInfomatics
                                 var ray = GetPointingPosition(skel);
                                 if (ray != null)
                                 {
+                                    SkeletonPoint intersect = ray.Item1;
+                                    if (stagePoints.Count >= 3)
+                                    {
+                                        float vx0 = stagePoints[1].X - stagePoints[0].X;
+                                        float vy0 = stagePoints[1].Y - stagePoints[0].Y;
+                                        float vx1 = stagePoints[2].X - stagePoints[0].X;
+                                        float vy1 = stagePoints[2].Y - stagePoints[0].Y;
+                                        float dx = intersect.X - stagePoints[0].X;
+                                        float dy = intersect.Y - stagePoints[0].Y;
+                                        float tx = (dx * vx0 + dy * vy0) / (vx0 * vx0 + vy0 * vy0);
+                                        float ty = (dx * vx1 + dy * vy1) / (vx1 * vx1 + vy1 * vy1);
+                                        SendText = tx + " " + ty;
+                                        IsSendText = true;
+                                        string message = "(tx, ty) = (" + tx + "," + ty + ")";
+                                        g.DrawString(message, new Font("Arial", 12), Brushes.Red, new PointF(10, 10));
+                                    }
                                     g.DrawLine(new Pen(Brushes.Red, 5),
                                         SkeletonPointToScreen(ray.Item2),
                                         SkeletonPointToScreen(ray.Item1));
@@ -146,6 +257,36 @@ namespace MediaInfomatics
                         }
                     }
                 }
+                foreach (SkeletonPoint sp in planePixels)
+                {
+                    Point p = SkeletonPointToScreen(sp);
+                    g.FillEllipse(Brushes.Green, p.X - 5, p.Y - 5, 11, 11);
+                }
+
+                foreach (SkeletonPoint sp in stagePoints)
+                {
+                    Point p = SkeletonPointToScreen(sp);
+                    g.FillEllipse(Brushes.Black, p.X - 5, p.Y - 5, 11, 11);
+                }
+                if (stagePoints.Count >= 2)
+                {
+                    Point p0 = SkeletonPointToScreen(stagePoints[0]);
+                    Point p1 = SkeletonPointToScreen(stagePoints[1]);
+                    g.DrawLine(new Pen(Color.Yellow)
+                    {
+                        CustomEndCap = new System.Drawing.Drawing2D.AdjustableArrowCap(5, 5)
+                    }, p0, p1);
+                }
+                if (stagePoints.Count >= 3)
+                {
+                    Point p0 = SkeletonPointToScreen(stagePoints[0]);
+                    Point p1 = SkeletonPointToScreen(stagePoints[2]);
+                    g.DrawLine(new Pen(Color.Cyan)
+                    {
+                        CustomEndCap = new System.Drawing.Drawing2D.AdjustableArrowCap(5, 5)
+                    }, p0, p1);
+                }
+
             }
         }
         #endregion
@@ -268,101 +409,12 @@ namespace MediaInfomatics
                 SkeletonPoint sPt1 = skelton.Joints[JointType.HandLeft].Position;
                 Point pt0 = SkeletonPointToScreen(sPt0);
                 Point pt1 = SkeletonPointToScreen(sPt1);
- /*               richTextBox1.Text = "diff0 = " + (sPt0.Z * 1000 - depthPixels[640 * pt0.Y + pt0.X].Depth) + "\n";
-                richTextBox1.Text += "diff1 = " + (sPt1.Z * 1000 - depthPixels[640 * pt1.Y + pt1.X].Depth) + "\n";
-                richTextBox1.Text += "sPt0.Z = " + sPt0.Z + "\n";
-                richTextBox1.Text += "sPt1.Z = " + sPt1.Z + "\n";
-                richTextBox1.Text += "Pt0.Depth = " + depthPixels[640 * pt0.Y + pt0.X].Depth + "\n";
-                richTextBox1.Text += "Pt1.Depth = " + depthPixels[640 * pt1.Y + pt1.X].Depth + "\n";
-                */
-                Vector4 dir = new Vector4()
+
+                if ( plane != null )
                 {
-                    X = sPt1.X - sPt0.X,
-                    Y = sPt1.Y - sPt0.Y,
-                    Z = sPt1.Z - sPt0.Z,
-                };
-                float dirLen = (float)Math.Sqrt(dir.X * dir.X + dir.Y * dir.Y + dir.Z * dir.Z);
-                dir.X /= dirLen;
-                dir.Y /= dirLen;
-                dir.Z /= dirLen;
-
-                float dx = pt1.X - pt0.X;
-                float dy = pt1.Y - pt0.Y;
-                float len = (float)Math.Sqrt(dx * dx + dy * dy);
-                dx /= len;
-                dy /= len;
-
-                const float max_t = 1;
-                const float dt = 1 * 0.001f;
-                float t = 0;
-                float t3d = dirLen / len;
-                Vector4 dir3d = new Vector4()
-                {
-                    X = dir.X * t3d,
-                    Y = dir.Y * t3d,
-                    Z = dir.Z * t3d,
-                };
-
-                float minDist = float.MaxValue;
-                SkeletonPoint minPos = new SkeletonPoint();
-
-
-                while (t < max_t)
-                {
-                    t += dt;
-                    float x3d = sPt1.X + dir.X * t;
-                    float y3d = sPt1.Y + dir.Y * t;
-                    float z3d = sPt1.Z + dir.Z * t;
-                    var sPos = new SkeletonPoint() { X = x3d, Y = y3d, Z = z3d };
-                    var pt = SkeletonPointToScreen(sPos);
-                    int x = pt.X;
-                    int y = pt.Y;
-                    if (x < 0 || 640 <= x) continue;
-                    if (y < 0 || 480 <= y) continue;
-
-                    if (depthPixels[640 * y + x].IsKnownDepth)
-                    {
-                        int depth = 0;
-                        if (1 <= x && x < 639 && 1 <= y && y < 479)
-                        {
-                            for (int py = -1; py <= 1; py++)
-                            for (int px = -1; px <= 1; px++)
-                            {
-                                depth += depthPixels[640 * (y + py) + (x + px)].Depth;
-                            }
-                        }
-                        depth /= 9;
-                        var depthPos = SkeletonDepthPointToSkeltonPoint(x, y, depth);
-                        float ddx = sPos.X - depthPos.X;
-                        float ddy = sPos.Y - depthPos.Y;
-                        float ddz = sPos.Z - depthPos.Z;
-                        float dist = (float)Math.Sqrt(ddx * ddx + ddy * ddy + ddz * ddz);
-                        if (minDist < trackBar1.Value * 0.001f)
-                        {
-                            return new Tuple<SkeletonPoint, SkeletonPoint>(new SkeletonPoint()
-                            {
-                                X = x3d,
-                                Y = y3d,
-                                Z = z3d
-                            },
-                            sPt1);
-                        }
-                        if (minDist > dist)
-                        {
-                            minDist = Math.Abs(dist);
-                            minPos = new SkeletonPoint()
-                            {
-                                X = x3d,
-                                Y = y3d,
-                                Z = z3d
-                            };
-                        }
-                    }
-                }
-                if (minDist != float.MaxValue)
-                {
-//                    richTextBox1.Text += "min:" + minDist + "\n";
-                    return new Tuple<SkeletonPoint, SkeletonPoint>(minPos, sPt1);
+                    SkeletonPoint isp = plane.getIntersectionPoint(sPt1, sPt0);
+                    if (!(isp.X == 0 && isp.Y == 0 && isp.Z == 0)) 
+                    return new Tuple<SkeletonPoint, SkeletonPoint>(isp, sPt1);
                 }
             }
             return null;
@@ -372,5 +424,21 @@ namespace MediaInfomatics
         {
             label1.Text = trackBar1.Value + "";
         }
+
+        private void cameraCanvas_MouseClick(object sender, MouseEventArgs e)
+        {
+            int depth = depthPixels[e.Y * 640 + e.X].Depth;
+            SkeletonPoint sp = SkeletonDepthPointToSkeltonPoint(e.X, e.Y, depth);
+            if (e.Button == System.Windows.Forms.MouseButtons.Left)
+            {
+                planePixels.Add(sp);
+                if (planePixels.Count == 4) planePixels.RemoveAt(0);
+                else if (planePixels.Count == 3) plane = new Plane(planePixels[0], planePixels[1], planePixels[2]);
+                stagePoints.Add(sp);
+                if (stagePoints.Count >= 4) stagePoints.RemoveAt(0);
+            }
+        }
+
+        List<SkeletonPoint> stagePoints = new List<SkeletonPoint>();
     }
 }
