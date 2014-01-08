@@ -262,7 +262,6 @@ namespace MediaInfomatics
                     Point p = SkeletonPointToScreen(sp);
                     g.FillEllipse(Brushes.Green, p.X - 5, p.Y - 5, 11, 11);
                 }
-
                 foreach (SkeletonPoint sp in stagePoints)
                 {
                     Point p = SkeletonPointToScreen(sp);
@@ -286,7 +285,6 @@ namespace MediaInfomatics
                         CustomEndCap = new System.Drawing.Drawing2D.AdjustableArrowCap(5, 5)
                     }, p0, p1);
                 }
-
             }
         }
         #endregion
@@ -409,7 +407,6 @@ namespace MediaInfomatics
                 SkeletonPoint sPt1 = skelton.Joints[JointType.HandLeft].Position;
                 Point pt0 = SkeletonPointToScreen(sPt0);
                 Point pt1 = SkeletonPointToScreen(sPt1);
-
                 if ( plane != null )
                 {
                     SkeletonPoint isp = plane.getIntersectionPoint(sPt1, sPt0);
