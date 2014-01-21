@@ -8,6 +8,7 @@ MultiMarker nya;
 SecondApplet app;
 PFrame frame;
 
+boolean isField = false;
 boolean[] isTarget = {false, false};
 PVector[] target = {new PVector(), new PVector()};
 PVector[] st = {new PVector(), new PVector()};
@@ -18,7 +19,8 @@ void setup() {
   println(MultiMarker.VERSION);
   
   String[] cameras = Capture.list();
-  cam = new Capture(this, cameras[0]);
+  for(String a : cameras) println(a);
+  cam = new Capture(this, cameras[1]);
   
   nya=new MultiMarker(this,width,height,"camera_para.dat",NyAR4PsgConfig.CONFIG_PSG);
   for(int i=0; i<6; i++) {
@@ -45,6 +47,8 @@ void draw()
       nya.isExistMarker(1) &&
       nya.isExistMarker(2) ) 
   {
+    isField = true;
+    
     // get position of three points
     PVector zero = new PVector(0.0, 0.0, 0.0);
     PVector origin, xp, yp;
@@ -110,18 +114,9 @@ void draw()
         isTarget[i] = false;
       }
     }
+  } else {
+    isField = false;
   }
-  /*
-  for(int i=0; i<6; i++) {
-    if( nya.isExistMarker(i) ){
-      nya.beginTransform(i);
-      fill(i*50,255-(i%3)*100,(i%2)*200);
-      translate(0,0,20);
-      box(40);
-      nya.endTransform();
-    }
-  }
-  */
 }
 
 PVector getST(PVector xaxis, PVector yaxis, PVector target) {
@@ -148,7 +143,11 @@ public class SecondApplet extends PApplet {
     }
 
     public void draw() {
-      background(255);
+      if (isField) {
+        background(255);
+      } else {
+        background(0);
+      }
       line(10, 10, 310, 10);
       line(10, 10, 10, 310);
       for(int i=0; i<2; i++) {
@@ -157,5 +156,54 @@ public class SecondApplet extends PApplet {
           line(posx + 10, posy + 10, posx + target[i].x*20 + 10, posy + target[i].y*20 + 10);
         }
       }
+      
+      PVector targetPos = updateTCPData();
+      float tx, ty;
+      if (targetPos.x != -100 && targetPos.y != -100) {
+        tx = targetPos.x;
+        ty = targetPos.y;
+      } else {
+        ellipse(tx*300+10, ty*300+10, 5, 5);
+      }
     }
 } 
+
+PVector updateTCPData()
+{
+  float tx = -100;
+  float ty = -100;
+  while (client.available() > 0)
+  {
+    // 何かデータが送られてきた
+    try
+    {
+      // クエリの取得
+      rcvText += client.readString();
+      if (rcvText.charAt(rcvText.length() - 1) != ';') continue;
+      rcvText = rcvText.substring(0, rcvText.length() - 1);
+      String[] texts = rcvText.split(" ");
+      rcvText = "";
+      tx = Float.parseFloat(texts[0]);
+      ty = Float.parseFloat(texts[1]);
+      sendText("s");
+    }
+    catch (Exception e)
+    {
+      println(e);
+    }
+  }
+  return new PVector(tx, ty);
+}
+// 送信
+void sendText(String text)
+{
+  int start = millis();
+  for (int i = 0; i < text.length(); i++)
+  {
+    sendTextBytes[i] = (byte)text.charAt(i);
+  }
+  Arrays.fill(sendTextBytes, text.length(), sendTextBytes.length, (byte)0);
+  //println("start sending text \"" + text + "\"");
+  client.write(sendTextBytes);
+  //println("done sending text (elapsed " + (millis() - start) + " ms");
+}
