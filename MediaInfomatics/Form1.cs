@@ -64,6 +64,39 @@ namespace MediaInfomatics
                 }
             }
             cameraCanvas.Image = new Bitmap(640, 480);
+
+            Plane plane = new Plane(
+                new SkeletonPoint
+                {
+                    X = 0.0f,
+                    Y = 3.4f,
+                    Z = 599.3f
+                },
+                new SkeletonPoint
+                {
+                    X = 422.2f,
+                    Y = 34.4f,
+                    Z = 1.33f
+                },
+                new SkeletonPoint
+                {
+                    X = -40.0f,
+                    Y = 345.43f,
+                    Z = -5.3f
+                });
+            plane.getIntersectionPoint(
+                new SkeletonPoint
+                {
+                    X = -2.0f,
+                    Y = 54.4f,
+                    Z = 89443.3f
+                },
+                new SkeletonPoint
+                {
+                    X = 20.0f,
+                    Y = 70003.4f,
+                    Z = 555.3f
+                });
         }
         unsafe private void SensorColorFrameReady(object sender, ColorImageFrameReadyEventArgs e)
         {
@@ -235,7 +268,9 @@ namespace MediaInfomatics
             // Convert point to depth space.  
             // We are not using depth directly, but we do want the points in our 640x480 output resolution.
             DepthImagePoint depthPoint = this.sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(skelpoint, DepthImageFormat.Resolution640x480Fps30);
+            ColorImagePoint colorPoint = this.sensor.CoordinateMapper.MapDepthPointToColorPoint(DepthImageFormat.Resolution640x480Fps30, depthPoint, ColorImageFormat.RgbResolution640x480Fps30);
             return new Point(depthPoint.X, depthPoint.Y);
+            //return new Point(colorPoint.X, colorPoint.Y);
         }
 
         private SkeletonPoint SkeletonDepthPointToSkeltonPoint(int x, int y, int depth)
@@ -287,7 +322,7 @@ namespace MediaInfomatics
 
                 if ( plane != null )
                 {
-                    SkeletonPoint isp = plane.getIntersectionPoint(sPt1, sPt0);
+                    SkeletonPoint isp = plane.getIntersectionPoint(sPt0, sPt1);
                     return new Tuple<SkeletonPoint, SkeletonPoint>(isp, sPt1);
                 }
 
