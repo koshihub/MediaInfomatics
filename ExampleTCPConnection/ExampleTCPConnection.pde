@@ -23,7 +23,7 @@ float tx, ty;
 void draw()
 {
   PVector targetPos = updateTCPData();
-  if (targetPos.x != -1 && targetPos.y != -1) {
+  if (targetPos.x != -100 && targetPos.y != -100) {
     tx = targetPos.x;
     ty = targetPos.y;
   }
@@ -35,8 +35,8 @@ void draw()
 // 受信
 PVector updateTCPData()
 {
-  float tx = -1;
-  float ty = -1;
+  float tx = -100;
+  float ty = -100;
   while (client.available() > 0)
   {
     // 何かデータが送られてきた

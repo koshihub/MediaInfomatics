@@ -20,6 +20,7 @@ namespace MediaInfomatics
         //
         const string Host = "127.0.0.1";
         const int Port = 8890;
+        bool moveToMouseCursor = true;
         TcpListener server;
         TcpClient client;
         bool IsSendText = false;
@@ -233,21 +234,24 @@ namespace MediaInfomatics
                                 var ray = GetPointingPosition(skel);
                                 if (ray != null)
                                 {
-                                    SkeletonPoint intersect = ray.Item1;
-                                    if (stagePoints.Count >= 3)
+                                    if (!moveToMouseCursor)
                                     {
-                                        float vx0 = stagePoints[1].X - stagePoints[0].X;
-                                        float vy0 = stagePoints[1].Y - stagePoints[0].Y;
-                                        float vx1 = stagePoints[2].X - stagePoints[0].X;
-                                        float vy1 = stagePoints[2].Y - stagePoints[0].Y;
-                                        float dx = intersect.X - stagePoints[0].X;
-                                        float dy = intersect.Y - stagePoints[0].Y;
-                                        float tx = (dx * vx0 + dy * vy0) / (vx0 * vx0 + vy0 * vy0);
-                                        float ty = (dx * vx1 + dy * vy1) / (vx1 * vx1 + vy1 * vy1);
-                                        SendText = tx + " " + ty;
-                                        IsSendText = true;
-                                        string message = "(tx, ty) = (" + tx + "," + ty + ")";
-                                        g.DrawString(message, new Font("Arial", 12), Brushes.Red, new PointF(10, 10));
+                                        SkeletonPoint movePoint = ray.Item1;
+                                        if (stagePoints.Count >= 3)
+                                        {
+                                            float vx0 = stagePoints[1].X - stagePoints[0].X;
+                                            float vy0 = stagePoints[1].Y - stagePoints[0].Y;
+                                            float vx1 = stagePoints[2].X - stagePoints[0].X;
+                                            float vy1 = stagePoints[2].Y - stagePoints[0].Y;
+                                            float dx = movePoint.X - stagePoints[0].X;
+                                            float dy = movePoint.Y - stagePoints[0].Y;
+                                            float tx = (dx * vx0 + dy * vy0) / (vx0 * vx0 + vy0 * vy0);
+                                            float ty = (dx * vx1 + dy * vy1) / (vx1 * vx1 + vy1 * vy1);
+                                            SendText = tx + " " + ty;
+                                            IsSendText = true;
+                                            string message = "(tx, ty) = (" + tx + "," + ty + ")";
+                                            g.DrawString(message, new Font("Arial", 12), Brushes.Red, new PointF(10, 10));
+                                        }
                                     }
                                     g.DrawLine(new Pen(Brushes.Red, 5),
                                         SkeletonPointToScreen(ray.Item2),
@@ -261,11 +265,6 @@ namespace MediaInfomatics
                 {
                     Point p = SkeletonPointToScreen(sp);
                     g.FillEllipse(Brushes.Green, p.X - 5, p.Y - 5, 11, 11);
-                }
-                foreach (SkeletonPoint sp in stagePoints)
-                {
-                    Point p = SkeletonPointToScreen(sp);
-                    g.FillEllipse(Brushes.Black, p.X - 5, p.Y - 5, 11, 11);
                 }
                 if (stagePoints.Count >= 2)
                 {
@@ -284,6 +283,26 @@ namespace MediaInfomatics
                     {
                         CustomEndCap = new System.Drawing.Drawing2D.AdjustableArrowCap(5, 5)
                     }, p0, p1);
+                }
+                foreach (SkeletonPoint sp in stagePoints)
+                {
+                    Point p = SkeletonPointToScreen(sp);
+                    g.FillEllipse(Brushes.Black, p.X - 5, p.Y - 5, 11, 11);
+                }
+                if (moveToMouseCursor && stagePoints.Count >= 4)
+                {
+                    float vx0 = stagePoints[1].X - stagePoints[0].X;
+                    float vy0 = stagePoints[1].Y - stagePoints[0].Y;
+                    float vx1 = stagePoints[2].X - stagePoints[0].X;
+                    float vy1 = stagePoints[2].Y - stagePoints[0].Y;
+                    float dx = stagePoints[3].X - stagePoints[0].X;
+                    float dy = stagePoints[3].Y - stagePoints[0].Y;
+                    float tx = (dx * vx0 + dy * vy0) / (vx0 * vx0 + vy0 * vy0);
+                    float ty = (dx * vx1 + dy * vy1) / (vx1 * vx1 + vy1 * vy1);
+                    SendText = tx + " " + ty;
+                    IsSendText = true;
+                    string message = "(tx, ty) = (" + tx + "," + ty + ")";
+                    g.DrawString(message, new Font("Arial", 12), Brushes.Red, new PointF(10, 10));
                 }
             }
         }
@@ -429,10 +448,13 @@ namespace MediaInfomatics
             if (e.Button == System.Windows.Forms.MouseButtons.Left)
             {
                 planePixels.Add(sp);
-                if (planePixels.Count == 4) planePixels.RemoveAt(0);
-                else if (planePixels.Count == 3) plane = new Plane(planePixels[0], planePixels[1], planePixels[2]);
                 stagePoints.Add(sp);
-                if (stagePoints.Count >= 4) stagePoints.RemoveAt(0);
+                if (planePixels.Count == 5)
+                {
+                    planePixels.RemoveAt(3);
+                    stagePoints.RemoveAt(3);
+                }
+                else if (planePixels.Count == 3) plane = new Plane(planePixels[0], planePixels[1], planePixels[2]);
             }
         }
 
