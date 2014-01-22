@@ -5,6 +5,8 @@ import processing.net.*;
 import java.util.*;
 import processing.serial.*;
 
+final boolean kinectMode = false;
+ 
 Serial serial;
 int speed_L = 0;
 int speed_R = 0;
@@ -168,7 +170,7 @@ public class SecondApplet extends PApplet {
         }
       }
       
-      PVector targetPos = updateTCPData();
+      targetPos = updateTCPData();
       float tx, ty;
       if (targetPos.x != -100 && targetPos.y != -100) {
         tx = targetPos.x;
@@ -178,15 +180,37 @@ public class SecondApplet extends PApplet {
       
       updateLocomo();
     }
-    
+
+    PVector targetPos;
+
     void updateLocomo()
     {
-      float mx = (mouseX - 10) / 300f;
-      float my = (mouseY - 10) / 300f;
+      float mx = 0;
+      float my = 0;
+      int i = 0;
+      
+      if (kinectMode) {
+        if (targetPos.x != -100 && targetPos.y != -100) {
+            mx = targetPos.x;
+            my = targetPos.y;
+            serial.write("L" + (0) + " R" + (0) + "\r");
+            return;
+        }
+      }
+      else {
+        if (!isTarget[i]) {
+          println ("11mx = " + mx + ", my = " + my);
+          serial.write("L" + (0) + " R" + (0) + "\r");
+          return;
+        }
+        mx = (mouseX - 10) / 300f;
+        my = (mouseY - 10) / 300f; 
+      }
+      
+      println ("mx = " + mx + ", my = " + my);
       
       if (mx < 0 || 1 < mx) return;
       if (my < 0 || 1 < my) return;
-      int i = 0;
       float dirX = mx - st[i].x;
       float dirY = my - st[i].y;
       float len = sqrt(dirX * dirX + dirY * dirY);
@@ -201,7 +225,7 @@ public class SecondApplet extends PApplet {
       if (abs(angle) <= thresAngle) {
         serial.write("L" + (-255) + " R" + (-255) + "\r");
       }
-      else if (angle < 0) {
+      else if (angle > 0) {
         serial.write("L" + (5) + " R" + (-5) + "\r");
       }
       else {
