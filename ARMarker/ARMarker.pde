@@ -1,7 +1,14 @@
 import processing.video.*;
 import jp.nyatla.nyar4psg.*;
 import java.awt.Frame;
+import processing.net.*;
+import java.util.*;
+import processing.serial.*;
 
+Serial serial;
+int speed_L = 0;
+int speed_R = 0;
+  
 Capture cam;
 MultiMarker nya;
 
@@ -15,6 +22,10 @@ PVector[] st = {new PVector(), new PVector()};
 
 void setup() {
   size(640,480,P3D);
+  // Locomoに接続
+  serial = new Serial(this,"COM3",9600);
+  
+  client = new Client(this, HOST, PORT);
   colorMode(RGB, 100);
   println(MultiMarker.VERSION);
   
@@ -162,12 +173,50 @@ public class SecondApplet extends PApplet {
       if (targetPos.x != -100 && targetPos.y != -100) {
         tx = targetPos.x;
         ty = targetPos.y;
-      } else {
         ellipse(tx*300+10, ty*300+10, 5, 5);
       }
+      
+      updateLocomo();
     }
+    
+    void updateLocomo()
+    {
+      float mx = (mouseX - 10) / 300f;
+      float my = (mouseY - 10) / 300f;
+      
+      if (mx < 0 || 1 < mx) return;
+      if (my < 0 || 1 < my) return;
+      int i = 0;
+      float dirX = mx - st[i].x;
+      float dirY = my - st[i].y;
+      float len = sqrt(dirX * dirX + dirY * dirY);
+      dirX /= len;
+      dirY /= len;
+      
+      // get angle between dir and target[i]
+      PVector vec1 = new PVector(target[i].x, target[i].y, 0);
+      PVector vec2 = new PVector(dirX, dirY, 0);
+      float angle = (float)degrees(PVector.angleBetween(vec1, vec2));
+      final float thresAngle = 30f;
+      if (abs(angle) <= thresAngle) {
+        serial.write("L" + (-255) + " R" + (-255) + "\r");
+      }
+      else if (angle < 0) {
+        serial.write("L" + (5) + " R" + (-5) + "\r");
+      }
+      else {
+        serial.write("L" + (-5) + " R" + (5) + "\r");
+      }
+/*  */  }
 } 
 
+String HOST = "127.0.0.1";
+int PORT = 8890;
+byte[] sendTextBytes = new byte[1];
+String sendText;
+Client client;
+String textPool = "";
+String rcvText = "";
 PVector updateTCPData()
 {
   float tx = -100;
