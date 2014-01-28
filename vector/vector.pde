@@ -6,7 +6,7 @@ int speed_R = 0;
   
 void setup() {
   // Locomoに接続
-  client = new Client(this, "157.82.4.116", 9750);
+  client = new Client(this, "172.20.10.3", 9750);
 }
   
 void draw() {

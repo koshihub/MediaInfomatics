@@ -20,7 +20,7 @@ namespace MediaInfomatics
         //
         const string Host = "127.0.0.1";
         const int Port = 8890;
-        bool moveToMouseCursor = true;
+        bool moveToMouseCursor = false;
         TcpListener server;
         TcpClient client;
         bool IsSendText = false;
@@ -101,6 +101,10 @@ namespace MediaInfomatics
                         {
                             IsSendText = false;
                             SendQuery(SendText);
+                        }
+                        else
+                        {
+                            SendQuery("-100 -100");
                         }
                     }
                 });
@@ -241,12 +245,15 @@ namespace MediaInfomatics
                                         {
                                             float vx0 = stagePoints[1].X - stagePoints[0].X;
                                             float vy0 = stagePoints[1].Y - stagePoints[0].Y;
+                                            float vz0 = stagePoints[1].Z - stagePoints[0].Z;
                                             float vx1 = stagePoints[2].X - stagePoints[0].X;
                                             float vy1 = stagePoints[2].Y - stagePoints[0].Y;
+                                            float vz1 = stagePoints[2].Z - stagePoints[0].Z;
                                             float dx = movePoint.X - stagePoints[0].X;
                                             float dy = movePoint.Y - stagePoints[0].Y;
-                                            float tx = (dx * vx0 + dy * vy0) / (vx0 * vx0 + vy0 * vy0);
-                                            float ty = (dx * vx1 + dy * vy1) / (vx1 * vx1 + vy1 * vy1);
+                                            float dz = movePoint.Z - stagePoints[0].Z;
+                                            float tx = (dx * vx0 + dy * vy0 + dz * vz0) / (vx0 * vx0 + vy0 * vy0 + vz0 * vz0);
+                                            float ty = (dx * vx1 + dy * vy1 + dz * vz1) / (vx1 * vx1 + vy1 * vy1 + vz1 * vz1);
                                             SendText = tx + " " + ty;
                                             IsSendText = true;
                                             string message = "(tx, ty) = (" + tx + "," + ty + ")";

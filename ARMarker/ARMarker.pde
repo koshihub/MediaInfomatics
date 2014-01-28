@@ -5,9 +5,11 @@ import processing.net.*;
 import java.util.*;
 import processing.serial.*;
 
-final boolean kinectMode = false;
- 
-Serial serial;
+final boolean kinectMode = true;
+
+//Serial locomo;
+Client locomo;
+
 int speed_L = 0;
 int speed_R = 0;
   
@@ -22,18 +24,29 @@ boolean[] isTarget = {false, false};
 PVector[] target = {new PVector(), new PVector()};
 PVector[] st = {new PVector(), new PVector()};
 
+PVector targetPos;
+    
+void connectLocomo() {
+  if (locomo != null) locomo.stop();
+  println("connecting to locomo...");
+  //locomo = new Serial(this,locomo"COM3",9600);
+  locomo = new Client(this, "172.20.10.5", 9750);
+  if( locomo != null ) println("connected to locomo!");
+}
+
 void setup() {
   size(640,480,P3D);
-  // Locomoに接続
-  serial = new Serial(this,"COM3",9600);
+  connectLocomo();
   
   client = new Client(this, HOST, PORT);
   colorMode(RGB, 100);
   println(MultiMarker.VERSION);
   
   String[] cameras = Capture.list();
-  for(String a : cameras) println(a);
-  cam = new Capture(this, cameras[1]);
+  //for(String a : cameras) println(a);
+  cam = new Capture(this, cameras[25]);
+  
+  targetPos = new PVector(-100, -100);
   
   nya=new MultiMarker(this,width,height,"camera_para.dat",NyAR4PsgConfig.CONFIG_PSG);
   for(int i=0; i<6; i++) {
@@ -170,18 +183,21 @@ public class SecondApplet extends PApplet {
         }
       }
       
-      targetPos = updateTCPData();
-      float tx, ty;
-      if (targetPos.x != -100 && targetPos.y != -100) {
+      PVector temp = updateTCPData();
+      if( !(temp.x < -50 || temp.y < -50) ) {
+        float tx, ty;
+        targetPos = temp;
         tx = targetPos.x;
         ty = targetPos.y;
         ellipse(tx*300+10, ty*300+10, 5, 5);
       }
       
-      updateLocomo();
+      if( !locomo.active() ) {
+        connectLocomo();
+      } else {
+        updateLocomo();
+      }
     }
-
-    PVector targetPos;
 
     void updateLocomo()
     {
@@ -190,17 +206,29 @@ public class SecondApplet extends PApplet {
       int i = 0;
       
       if (kinectMode) {
-        if (targetPos.x != -100 && targetPos.y != -100) {
+        if (targetPos.x < -50 || targetPos.y < -50) {
+            println("stop!");
+            locomo.write("L" + (0) + " R" + (0) + "\r");
+            locomo.write("L" + (0) + " R" + (0) + "\r");
+            locomo.write("L" + (0) + " R" + (0) + "\r");
+            return;
+        } else {
             mx = targetPos.x;
             my = targetPos.y;
-            serial.write("L" + (0) + " R" + (0) + "\r");
-            return;
+        }
+        if (!isTarget[i] || !isField) {
+          println("stop!");
+          locomo.write("L" + (0) + " R" + (0) + "\r");
+          locomo.write("L" + (0) + " R" + (0) + "\r");
+          locomo.write("L" + (0) + " R" + (0) + "\r");
+          return;
         }
       }
       else {
-        if (!isTarget[i]) {
-          println ("11mx = " + mx + ", my = " + my);
-          serial.write("L" + (0) + " R" + (0) + "\r");
+        if (!isTarget[i] || !isField) {
+          locomo.write("L" + (0) + " R" + (0) + "\r");
+          locomo.write("L" + (0) + " R" + (0) + "\r");
+          locomo.write("L" + (0) + " R" + (0) + "\r");
           return;
         }
         mx = (mouseX - 10) / 300f;
@@ -209,8 +237,8 @@ public class SecondApplet extends PApplet {
       
       println ("mx = " + mx + ", my = " + my);
       
-      if (mx < 0 || 1 < mx) return;
-      if (my < 0 || 1 < my) return;
+      if (mx < -1 || 2 < mx) return;
+      if (my < -1 || 2 < my) return;
       float dirX = mx - st[i].x;
       float dirY = my - st[i].y;
       float len = sqrt(dirX * dirX + dirY * dirY);
@@ -223,15 +251,15 @@ public class SecondApplet extends PApplet {
       float angle = (float)degrees(PVector.angleBetween(vec1, vec2));
       final float thresAngle = 30f;
       if (abs(angle) <= thresAngle) {
-        serial.write("L" + (-255) + " R" + (-255) + "\r");
+        locomo.write("L" + (-255) + " R" + (-255) + "\r");
       }
       else if (angle > 0) {
-        serial.write("L" + (5) + " R" + (-5) + "\r");
+        locomo.write("L" + (5) + " R" + (-5) + "\r");
       }
       else {
-        serial.write("L" + (-5) + " R" + (5) + "\r");
+        locomo.write("L" + (-5) + " R" + (5) + "\r");
       }
-/*  */  }
+  }
 } 
 
 String HOST = "127.0.0.1";
